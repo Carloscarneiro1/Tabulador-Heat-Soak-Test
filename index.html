@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tabulador Heat Soak Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root{
+      --bg-main:#0f172a;
+      --bg-surface:#020617;
+      --bg-card:#020617;
+      --border-soft:#1f2937;
+      --text-main:#e5e7eb;
+      --text-muted:#9ca3af;
+      --accent:#38bdf8;
+      --accent-soft:rgba(56,189,248,.15);
+      --danger:#f97373;
+      --ok:#22c55e;
+      --warn:#facc15;
+    }
+    body.light{
+      --bg-main:#f3f4f6;
+      --bg-surface:#e5e7eb;
+      --bg-card:#ffffff;
+      --border-soft:#e5e7eb;
+      --text-main:#111827;
+      --text-muted:#6b7280;
+      --accent:#2563eb;
+      --accent-soft:rgba(37,99,235,.12);
+      --danger:#dc2626;
+      --ok:#16a34a;
+      --warn:#ca8a04;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top left,#1e293b 0,var(--bg-main) 45%,#020617 100%);
+      color:var(--text-main);
+      min-height:100vh;
+    }
+    .shell{max-width:1200px;margin:0 auto;padding:24px 16px 40px}
+    .top-bar{
+      display:flex;align-items:flex-start;justify-content:space-between;
+      gap:12px;margin-bottom:18px;flex-wrap:wrap;
+    }
+    .title-block{display:flex;flex-direction:column;gap:4px}
+    .title-block h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.03em}
+    .title-pill{
+      font-size:11px;text-transform:uppercase;letter-spacing:.16em;
+      color:var(--accent);background:var(--accent-soft);
+      border-radius:999px;padding:2px 10px;display:inline-flex;align-items:center;gap:6px;width:fit-content
+    }
+    .chip-dot{width:7px;height:7px;border-radius:999px;background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.2)}
+    .title-block p{margin:0;font-size:12px;color:var(--text-muted);max-width:900px;line-height:1.35}
+    .top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{
+      border-radius:999px;border:1px solid var(--border-soft);
+      background:rgba(15,23,42,.7);color:var(--text-main);
+      padding:7px 13px;font-size:12px;display:inline-flex;align-items:center;gap:6px;
+      cursor:pointer;transition:.15s ease
+    }
+    body.light .btn{background:var(--bg-card)}
+    .btn:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-soft)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn-icon{font-size:14px}
+    .chip{
+      border-radius:999px;border:1px solid var(--border-soft);
+      padding:4px 9px;font-size:11px;color:var(--text-muted);
+      display:inline-flex;align-items:center;gap:6px;background:rgba(15,23,42,.6)
+    }
+    body.light .chip{background:var(--bg-card)}
+    .panel{
+      background:radial-gradient(circle at top left,rgba(56,189,248,.12),var(--bg-card));
+      border-radius:18px;padding:12px 14px 14px;border:1px solid rgba(148,163,184,.25);
+      box-shadow:0 18px 40px rgba(15,23,42,.55);margin-bottom:16px
+    }
+    body.light .panel{background:linear-gradient(145deg,#fff,#f9fafb);box-shadow:0 16px 30px rgba(15,23,42,.12)}
+    .panel-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .panel-tag{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent)}
+    .panel-header h3{margin:0;font-size:14px}
+    .panel-header p{margin:4px 0 0;font-size:11px;color:var(--text-muted);line-height:1.35;max-width:900px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .pill{
+      font-size:10px;border-radius:999px;padding:2px 8px;border:1px solid rgba(148,163,184,.55);
+      background:rgba(15,23,42,.55);color:var(--text-muted);white-space:nowrap
+    }
+    body.light .pill{background:rgba(248,250,252,.95)}
+    .grid-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+    @media (max-width:900px){.grid-2{grid-template-columns:minmax(0,1fr)}}
+    .field{
+      display:flex;flex-direction:column;gap:6px;background:rgba(15,23,42,.35);
+      border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:10px 10px 9px
+    }
+    body.light .field{background:rgba(248,250,252,.9)}
+    .field label{font-size:11px;color:var(--text-muted)}
+    .field input,.field select,.field textarea{
+      width:100%;
+      border-radius:12px;border:1px solid rgba(148,163,184,.35);
+      background:rgba(15,23,42,.55);color:var(--text-main);
+      padding:9px 10px;font-size:12px;outline:none
+    }
+    body.light .field input, body.light .field select, body.light .field textarea{background:#fff;color:var(--text-main)}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+    .hint{font-size:11px;color:var(--text-muted)}
+    .danger{color:var(--danger)}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    .hide{display:none!important}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+    /* HERO IMAGEM */
+    .hero{
+      margin-top:14px;
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(148,163,184,.25);
+      box-shadow:0 18px 40px rgba(15,23,42,.55);
+      position:relative;
+      background:rgba(2,6,23,.6);
+      min-height:220px;
+    }
+    body.light .hero{box-shadow:0 16px 30px rgba(15,23,42,.12)}
+    .hero img{
+      width:100%;
+      height:280px;
+      object-fit:cover;
+      display:block;
+      filter:saturate(1.05) contrast(1.02);
+      opacity:.92;
+    }
+    .hero::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 25% 20%, rgba(56,189,248,.22), transparent 55%),
+        linear-gradient(to top, rgba(2,6,23,.88) 0%, rgba(2,6,23,.35) 45%, rgba(2,6,23,.12) 100%);
+      pointer-events:none;
+    }
+    .hero-content{
+      position:absolute;
+      left:16px;
+      bottom:14px;
+      right:16px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-end;
+      z-index:1;
+      flex-wrap:wrap;
+    }
+    .hero-title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      max-width:760px;
+    }
+    .hero-title h2{
+      margin:0;
+      font-size:16px;
+      letter-spacing:.02em;
+    }
+    .hero-title p{
+      margin:0;
+      font-size:11px;
+      color:var(--text-muted);
+      line-height:1.35;
+    }
+    .hero-badges{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+
+<body class="dark">
+  <div class="shell">
+    <div class="top-bar">
+      <div class="title-block">
+        <div class="title-pill"><span class="chip-dot"></span>TABULADOR · HEAT SOAK TEST</div>
+        <h1>Tabulador Heat Soak Test</h1>
+        <p id="subtitle">
+          Registre a execução (ou impedimento) do teste Heat Soak.
+          Saída: <b>heatsoak_registros.csv</b> (via GitHub, se configurar token) ou exportação manual em CSV.
+        </p>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn" id="themeToggle">
+          <span class="btn-icon">🌙</span>
+          <span class="mode-label">Tema escuro</span>
+        </button>
+        <button class="btn" id="btnConfig">
+          <span class="btn-icon">🔑</span>
+          Token GitHub
+        </button>
+        <span class="chip">
+          <span class="chip-dot"></span>
+          Registro rápido
+        </span>
+      </div>
+    </div>
+
+    <!-- HERO (FOTO) -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-tag">Heat Soak</div>
+          <h3>Visão geral</h3>
+          <p>Preencha a pergunta inicial e o formulário abrirá somente os campos necessários (SIM/NÃO).</p>
+        </div>
+        <div class="row">
+          <span class="pill">Token: <b id="tokenState" class="warn">não configurado</b></span>
+          <span class="pill">Status: <span id="loadState" class="mono">—</span></span>
+        </div>
+      </div>
+
+      <div class="hero" aria-label="Heat Soak Test - capa">
+        <!-- ✅ Coloque sua imagem na raiz do repo com o nome: heatsoak_banner.png -->
+        <img src="heatsoak_banner.png" alt="Heat Soak Test Furnace" />
+        <div class="hero-content">
+          <div class="hero-title">
+            <h2>Registro de execução e ocorrências</h2>
+            <p>
+              Se o teste não for realizado, registre <b>etapa</b> e <b>motivo</b>.
+              Se for realizado, registre <b>lote</b>, <b>quantidade</b> e <b>origem</b>.
+            </p>
+          </div>
+          <div class="hero-badges">
+            <span class="pill">🧪 Teste</span>
+            <span class="pill">🗂️ Registro</span>
+            <span class="pill">✅ / ❌ Condicional</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-tag">Tabulador</div>
+          <h3>Registrar</h3>
+          <p>Preencha os campos e clique em <b>Salvar registro</b>. Sem token, você pode <b>Exportar CSV</b> e subir manualmente no GitHub.</p>
+        </div>
+        <div class="row">
+          <span class="pill">Arquivo: <b class="mono" id="fileLabel">heatsoak_registros.csv</b></span>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field" style="grid-column:1/-1;">
+          <label>Foi possível realizar o teste?</label>
+          <select id="f_realizado">
+            <option value="">Selecione...</option>
+            <option value="SIM">Sim</option>
+            <option value="NAO">Não</option>
+          </select>
+          <div class="hint">A escolha acima define quais campos serão exibidos abaixo.</div>
+        </div>
+
+        <div class="field hide" id="wrap_etapa">
+          <label>Etapa</label>
+          <select id="f_etapa">
+            <option value="">Selecione...</option>
+            <option value="1 - Carregamento das amostras">1 - Carregamento das amostras</option>
+            <option value="2 - Processamento">2 - Processamento</option>
+            <option value="3 - Descarte">3 - Descarte</option>
+          </select>
+        </div>
+
+        <div class="field hide" id="wrap_motivo">
+          <label>Por que não foi possível realizar o teste?</label>
+          <select id="f_motivo">
+            <option value="">Selecione...</option>
+            <option value="Condição Insegura">Condição Insegura</option>
+            <option value="Falta de efetivo">Falta de efetivo</option>
+            <option value="Queda de energia">Queda de energia</option>
+            <option value="Falta de material">Falta de material</option>
+            <option value="Equipamento em manutenção">Equipamento em manutenção</option>
+          </select>
+        </div>
+
+        <div class="field hide" id="wrap_data">
+          <label>Data do registro</label>
+          <input id="f_data" type="date" />
+        </div>
+
+        <div class="field hide" id="wrap_lote">
+          <label>Lote de teste</label>
+          <input id="f_lote" type="text" placeholder="Ex.: 0190882046" />
+        </div>
+
+        <div class="field hide" id="wrap_qtd">
+          <label>Quantidade de chapas testadas</label>
+          <input id="f_qtd" type="number" min="0" step="1" placeholder="0" />
+        </div>
+
+        <div class="field hide" id="wrap_origem">
+          <label>Origem (árvore de decisão)</label>
+          <select id="f_origem">
+            <option value="">Selecione...</option>
+            <option value="JC1">JC1</option>
+            <option value="JC3">JC3</option>
+            <option value="JC5">JC5</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:space-between;margin-top:12px;">
+        <div class="hint" id="saveHint">—</div>
+        <div class="row">
+          <button class="btn" id="btnExport"><span class="btn-icon">⬇️</span>Exportar CSV</button>
+          <button class="btn" id="btnSave"><span class="btn-icon">💾</span>Salvar registro</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL TOKEN -->
+    <div id="modal" class="hide" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;">
+      <div style="max-width:720px;width:100%;background:radial-gradient(circle at top left,rgba(56,189,248,.12),var(--bg-card));
+        border:1px solid rgba(148,163,184,.25);border-radius:18px;box-shadow:0 18px 40px rgba(15,23,42,.55);padding:14px;">
+        <div class="panel-header" style="margin-bottom:6px;">
+          <div>
+            <div class="panel-tag">Configuração</div>
+            <h3>Token GitHub (para gravar no repo)</h3>
+            <p>
+              Para salvar diretamente no GitHub, gere um token (Fine-grained PAT) com permissão de <b>Contents: Read and write</b> no repo.
+              O token fica salvo no seu navegador (localStorage).
+            </p>
+          </div>
+          <div class="row">
+            <button class="btn" id="closeModal"><span class="btn-icon">✖</span>Fechar</button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>GitHub Owner</label>
+            <input id="cfg_owner" type="text" />
+          </div>
+          <div class="field">
+            <label>Repo do Tabulador</label>
+            <input id="cfg_repo" type="text" />
+          </div>
+          <div class="field" style="grid-column:1/-1;">
+            <label>Token (Fine-grained PAT) — NÃO compartilhe</label>
+            <input id="cfg_token" type="password" placeholder="github_pat_..." />
+            <div class="hint">Permissões mínimas: somente o repo + <b>Contents Read/Write</b>.</div>
+          </div>
+          <div class="field">
+            <label>Caminho do arquivo</label>
+            <input id="cfg_path" type="text" />
+          </div>
+          <div class="field">
+            <label>Branch</label>
+            <input id="cfg_branch" type="text" />
+          </div>
+        </div>
+
+        <div class="row" style="justify-content:space-between;margin-top:10px;">
+          <div class="hint">Sem token: use <b>Exportar CSV</b> e faça upload manual no repo.</div>
+          <div class="row">
+            <button class="btn" id="btnClearToken"><span class="btn-icon">🧹</span>Limpar token</button>
+            <button class="btn" id="btnSaveConfig"><span class="btn-icon">✅</span>Salvar config</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // =========================
+    // CONFIG (AJUSTE AQUI)
+    // =========================
+    const DEFAULT_GH_OWNER = "carloscarneiro1";
+    const DEFAULT_GH_REPO  = "TabuladorHeatSoak";   // <- se quiser, troque para o nome real do seu repo
+    const DEFAULT_GH_PATH  = "heatsoak_registros.csv";
+    const DEFAULT_GH_BRANCH= "main";
+
+    // =========================
+    // HELPERS
+    // =========================
+    function limparCampo(str){
+      if(str == null) return "";
+      return String(str).replace("\ufeff","").trim();
+    }
+    function safeCSV(v){
+      const s = String(v ?? "");
+      if(/[;"\n\r,]/.test(s)){
+        return `"${s.replace(/"/g,'""')}"`;
+      }
+      return s;
+    }
+
+    // =========================
+    // CONFIG STORAGE
+    // =========================
+    function loadCfg(){
+      return {
+        owner: localStorage.getItem("tabHST_owner") || DEFAULT_GH_OWNER,
+        repo: localStorage.getItem("tabHST_repo")  || DEFAULT_GH_REPO,
+        path: localStorage.getItem("tabHST_path")  || DEFAULT_GH_PATH,
+        branch: localStorage.getItem("tabHST_branch")|| DEFAULT_GH_BRANCH,
+        token: localStorage.getItem("tabHST_token") || ""
+      };
+    }
+    function saveCfg(cfg){
+      localStorage.setItem("tabHST_owner", cfg.owner || "");
+      localStorage.setItem("tabHST_repo",  cfg.repo  || "");
+      localStorage.setItem("tabHST_path",  cfg.path  || "");
+      localStorage.setItem("tabHST_branch",cfg.branch|| "");
+      localStorage.setItem("tabHST_token", cfg.token || "");
+    }
+    function setTokenState(){
+      const cfg = loadCfg();
+      const el = document.getElementById("tokenState");
+      const fileLabel = document.getElementById("fileLabel");
+      fileLabel.textContent = cfg.path || DEFAULT_GH_PATH;
+
+      if(cfg.token){
+        el.textContent = "configurado";
+        el.className = "ok";
+      }else{
+        el.textContent = "não configurado";
+        el.className = "warn";
+      }
+    }
+
+    // =========================
+    // UI - CONDICIONAL
+    // =========================
+    const fRealizado = document.getElementById("f_realizado");
+
+    const wrapEtapa  = document.getElementById("wrap_etapa");
+    const wrapMotivo = document.getElementById("wrap_motivo");
+
+    const wrapData   = document.getElementById("wrap_data");
+    const wrapLote   = document.getElementById("wrap_lote");
+    const wrapQtd    = document.getElementById("wrap_qtd");
+    const wrapOrigem = document.getElementById("wrap_origem");
+
+    function show(el){ el.classList.remove("hide"); }
+    function hide(el){ el.classList.add("hide"); }
+
+    function applyConditional(){
+      const v = limparCampo(fRealizado.value);
+
+      if(!v){
+        hide(wrapEtapa); hide(wrapMotivo);
+        hide(wrapData); hide(wrapLote); hide(wrapQtd); hide(wrapOrigem);
+        return;
+      }
+
+      // etapa aparece tanto no SIM quanto no NÃO
+      show(wrapEtapa);
+
+      if(v === "NAO"){
+        show(wrapMotivo);
+        hide(wrapData); hide(wrapLote); hide(wrapQtd); hide(wrapOrigem);
+      }else{
+        hide(wrapMotivo);
+        show(wrapData); show(wrapLote); show(wrapQtd); show(wrapOrigem);
+
+        // se data vazia, coloca hoje
+        const fData = document.getElementById("f_data");
+        if(!fData.value){
+          const today = new Date();
+          const yyyy = String(today.getFullYear()).padStart(4,"0");
+          const mm = String(today.getMonth()+1).padStart(2,"0");
+          const dd = String(today.getDate()).padStart(2,"0");
+          fData.value = `${yyyy}-${mm}-${dd}`;
+        }
+      }
+    }
+    fRealizado.addEventListener("change", applyConditional);
+
+    // =========================
+    // REGISTROS (MEMÓRIA LOCAL) + CSV
+    // =========================
+    let registros = [];
+
+    // Tenta carregar o CSV existente do raw (se houver) só para manter continuidade
+    async function loadExisting(){
+      document.getElementById("loadState").textContent = "carregando...";
+      setTokenState();
+
+      const cfg = loadCfg();
+      const rawURL = `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}`;
+      try{
+        const resp = await fetch(rawURL, { cache: "no-store" });
+        if(resp.ok){
+          const txt = await resp.text();
+          registros = parseRegistros(txt);
+          document.getElementById("loadState").textContent = "ok";
+        }else{
+          // arquivo pode não existir ainda
+          document.getElementById("loadState").textContent = "ok";
+        }
+      }catch{
+        document.getElementById("loadState").textContent = "ok";
+      }
+    }
+
+    // Header:
+    // timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem
+    function parseRegistros(csv){
+      const txt = (csv || "").trim();
+      if(!txt) return [];
+      const linhas = txt.split(/\r?\n/).filter(l=>l.trim()!=="");
+      if(linhas.length < 1) return [];
+
+      const delim = linhas[0].includes(";") ? ";" : ",";
+      const header = linhas[0];
+      const hasHeader = header.toLowerCase().includes("timestam") && header.toLowerCase().includes("etapa");
+      const data = hasHeader ? linhas.slice(1) : linhas;
+
+      function parseLine(line){
+        // parse simples p/ CSV com aspas
+        const out = [];
+        let cur = "";
+        let inQuotes = false;
+        for(let i=0;i<line.length;i++){
+          const ch = line[i];
+          if(ch === '"'){
+            const next = line[i+1];
+            if(inQuotes && next === '"'){ cur += '"'; i++; }
+            else inQuotes = !inQuotes;
+            continue;
+          }
+          if(ch === delim && !inQuotes){
+            out.push(cur); cur=""; continue;
+          }
+          cur += ch;
+        }
+        out.push(cur);
+        return out.map(limparCampo);
+      }
+
+      return data.map(l=>{
+        const c = parseLine(l);
+        if(!c[0]) return null;
+        return {
+          timestampISO: c[0] || "",
+          foiPossivel: c[1] || "",
+          etapa: c[2] || "",
+          motivoNao: c[3] || "",
+          dataRegistro: c[4] || "",
+          loteTeste: c[5] || "",
+          qtdChapas: c[6] || "",
+          origem: c[7] || ""
+        };
+      }).filter(Boolean);
+    }
+
+    function buildCSV(){
+      const header = "timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem";
+      const lines = [header];
+      registros.forEach(r=>{
+        lines.push([
+          safeCSV(r.timestampISO),
+          safeCSV(r.foiPossivel),
+          safeCSV(r.etapa),
+          safeCSV(r.motivoNao),
+          safeCSV(r.dataRegistro),
+          safeCSV(r.loteTeste),
+          safeCSV(r.qtdChapas),
+          safeCSV(r.origem)
+        ].join(";"));
+      });
+      return lines.join("\n") + "\n";
+    }
+
+    // =========================
+    // SAVE / EXPORT
+    // =========================
+    document.getElementById("btnSave").addEventListener("click", saveRegistro);
+    document.getElementById("btnExport").addEventListener("click", exportCSV);
+
+    function validateAndCollect(){
+      const foiPossivel = limparCampo(document.getElementById("f_realizado").value);
+      const etapa = limparCampo(document.getElementById("f_etapa").value);
+
+      const motivoNao = limparCampo(document.getElementById("f_motivo").value);
+      const dataRegistro = limparCampo(document.getElementById("f_data").value);
+      const loteTeste = limparCampo(document.getElementById("f_lote").value);
+      const qtdChapas = limparCampo(document.getElementById("f_qtd").value);
+      const origem = limparCampo(document.getElementById("f_origem").value);
+
+      if(!foiPossivel){
+        return { ok:false, msg:"Selecione <b>Foi possível realizar o teste?</b>." };
+      }
+      if(!etapa){
+        return { ok:false, msg:"Selecione a <b>Etapa</b>." };
+      }
+
+      if(foiPossivel === "NAO"){
+        if(!motivoNao){
+          return { ok:false, msg:"Selecione <b>Por que não foi possível realizar o teste?</b>." };
+        }
+      }else{
+        if(!dataRegistro) return { ok:false, msg:"Preencha a <b>Data do registro</b>." };
+        if(!loteTeste)   return { ok:false, msg:"Preencha o <b>Lote de teste</b>." };
+        if(!qtdChapas || Number(qtdChapas) < 0) return { ok:false, msg:"Preencha a <b>Quantidade de chapas testadas</b>." };
+        if(!origem)     return { ok:false, msg:"Selecione a <b>Origem</b> (JC1/JC3/JC5)." };
+      }
+
+      return {
+        ok:true,
+        data:{
+          timestampISO: new Date().toISOString(),
+          foiPossivel,
+          etapa,
+          motivoNao: foiPossivel === "NAO" ? motivoNao : "",
+          dataRegistro: foiPossivel === "SIM" ? dataRegistro : "",
+          loteTeste: foiPossivel === "SIM" ? loteTeste : "",
+          qtdChapas: foiPossivel === "SIM" ? String(qtdChapas) : "",
+          origem: foiPossivel === "SIM" ? origem : ""
+        }
+      };
+    }
+
+    async function saveRegistro(){
+      const cfg = loadCfg();
+      setTokenState();
+
+      const chk = validateAndCollect();
+      if(!chk.ok){
+        document.getElementById("saveHint").innerHTML = `<span class="danger">Atenção:</span> ${chk.msg}`;
+        return;
+      }
+
+      const rec = chk.data;
+      registros.push(rec);
+
+      if(!cfg.token){
+        document.getElementById("saveHint").innerHTML =
+          `<span class="warn">Token não configurado.</span> Registro guardado na página. Clique em <b>Exportar CSV</b> para baixar e subir manualmente no repo.`;
+        return;
+      }
+
+      document.getElementById("btnSave").disabled = true;
+      document.getElementById("saveHint").innerHTML = `Salvando no GitHub...`;
+
+      try{
+        const apiBase = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}`;
+
+        // 1) ler arquivo atual
+        let sha = null;
+        let currentContent = "";
+
+        const getResp = await fetch(`${apiBase}?ref=${encodeURIComponent(cfg.branch)}`,{
+          headers:{
+            "Authorization": `Bearer ${cfg.token}`,
+            "Accept":"application/vnd.github+json"
+          }
+        });
+
+        if(getResp.status === 200){
+          const data = await getResp.json();
+          sha = data.sha;
+          const decoded = atob((data.content || "").replace(/\n/g,""));
+          currentContent = decoded || "";
+          registros = parseRegistros(currentContent); // reindexa do arquivo real
+          registros.push(rec);
+        }else if(getResp.status === 404){
+          // arquivo ainda não existe
+          sha = null;
+          currentContent = "";
+        }else{
+          const txt = await getResp.text();
+          throw new Error(`Falha ao ler arquivo (${getResp.status}): ${txt}`);
+        }
+
+        // 2) montar conteúdo
+        const next = buildCSV();
+
+        // 3) commit via PUT
+        const putBody = {
+          message: `Registro Heat Soak (${rec.foiPossivel}) - ${rec.timestampISO}`,
+          content: btoa(unescape(encodeURIComponent(next))),
+          branch: cfg.branch
+        };
+        if(sha) putBody.sha = sha;
+
+        const putResp = await fetch(apiBase,{
+          method:"PUT",
+          headers:{
+            "Authorization": `Bearer ${cfg.token}`,
+            "Accept":"application/vnd.github+json",
+            "Content-Type":"application/json"
+          },
+          body: JSON.stringify(putBody)
+        });
+
+        if(!putResp.ok){
+          const txt = await putResp.text();
+          throw new Error(`Falha ao gravar (${putResp.status}): ${txt}`);
+        }
+
+        document.getElementById("saveHint").innerHTML =
+          `<span class="ok">Salvo com sucesso!</span> Registro gravado em <b>${cfg.owner}/${cfg.repo}</b>.`;
+
+      }catch(err){
+        console.error(err);
+        document.getElementById("saveHint").innerHTML = `<span class="danger">Erro:</span> ${String(err.message || err)}`;
+      }finally{
+        document.getElementById("btnSave").disabled = false;
+      }
+    }
+
+    function exportCSV(){
+      const csv = buildCSV();
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "heatsoak_registros.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      document.getElementById("saveHint").innerHTML = `<span class="ok">Exportado!</span> Se quiser, suba o arquivo no repo.`;
+    }
+
+    // =========================
+    // TEMA
+    // =========================
+    const themeToggle = document.getElementById("themeToggle");
+    function aplicaTemaInicial(){
+      const salvo = localStorage.getItem("tabHST_tema");
+      if(salvo === "light"){
+        document.body.classList.remove("dark"); document.body.classList.add("light");
+        themeToggle.querySelector(".btn-icon").textContent = "☀️";
+        themeToggle.querySelector(".mode-label").textContent = "Tema claro";
+      }else{
+        document.body.classList.remove("light"); document.body.classList.add("dark");
+        themeToggle.querySelector(".btn-icon").textContent = "🌙";
+        themeToggle.querySelector(".mode-label").textContent = "Tema escuro";
+      }
+    }
+    aplicaTemaInicial();
+    themeToggle.addEventListener("click", ()=>{
+      const isDark = document.body.classList.contains("dark");
+      if(isDark){
+        document.body.classList.remove("dark"); document.body.classList.add("light");
+        themeToggle.querySelector(".btn-icon").textContent = "☀️";
+        themeToggle.querySelector(".mode-label").textContent = "Tema claro";
+        localStorage.setItem("tabHST_tema","light");
+      }else{
+        document.body.classList.remove("light"); document.body.classList.add("dark");
+        themeToggle.querySelector(".btn-icon").textContent = "🌙";
+        themeToggle.querySelector(".mode-label").textContent = "Tema escuro";
+        localStorage.setItem("tabHST_tema","dark");
+      }
+    });
+
+    // =========================
+    // MODAL CONFIG TOKEN
+    // =========================
+    const modal = document.getElementById("modal");
+    document.getElementById("btnConfig").addEventListener("click", ()=>{
+      const cfg = loadCfg();
+      document.getElementById("cfg_owner").value  = cfg.owner;
+      document.getElementById("cfg_repo").value   = cfg.repo;
+      document.getElementById("cfg_path").value   = cfg.path;
+      document.getElementById("cfg_branch").value = cfg.branch;
+      document.getElementById("cfg_token").value  = cfg.token;
+      modal.classList.remove("hide");
+    });
+    document.getElementById("closeModal").addEventListener("click", ()=> modal.classList.add("hide"));
+    modal.addEventListener("click",(e)=>{ if(e.target === modal) modal.classList.add("hide"); });
+
+    document.getElementById("btnSaveConfig").addEventListener("click", ()=>{
+      const cfg = {
+        owner: limparCampo(document.getElementById("cfg_owner").value),
+        repo: limparCampo(document.getElementById("cfg_repo").value),
+        path: limparCampo(document.getElementById("cfg_path").value),
+        branch: limparCampo(document.getElementById("cfg_branch").value),
+        token: limparCampo(document.getElementById("cfg_token").value)
+      };
+      saveCfg(cfg);
+      setTokenState();
+      modal.classList.add("hide");
+      document.getElementById("saveHint").innerHTML = `<span class="ok">Config salva!</span>`;
+      loadExisting(); // tenta carregar o arquivo do novo repo/caminho
+    });
+
+    document.getElementById("btnClearToken").addEventListener("click", ()=>{
+      const cfg = loadCfg();
+      cfg.token = "";
+      saveCfg(cfg);
+      document.getElementById("cfg_token").value = "";
+      setTokenState();
+    });
+
+    // =========================
+    // INIT
+    // =========================
+    setTokenState();
+    applyConditional();
+    loadExisting().catch(()=>{ document.getElementById("loadState").textContent = "ok"; });
+  </script>
+</body>
+</html>
