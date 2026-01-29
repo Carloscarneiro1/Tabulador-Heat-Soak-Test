@@ -222,13 +222,13 @@
             <h2>Registro de execução e ocorrências</h2>
             <p>
               Se o teste não for realizado, registre <b>etapa</b> e <b>motivo</b>.
-              Se for realizado, registre <b>lote</b>, <b>quantidade</b> e <b>origem</b>.
+              Se for realizado, registre <b>lote</b>, <b>quantidade</b>, <b>dimensão</b>, <b>m²</b> e <b>tonelagem</b>.
             </p>
           </div>
           <div class="hero-badges">
             <span class="pill">🧪 Teste</span>
             <span class="pill">🗂️ Registro</span>
-            <span class="pill">✅ / ❌ Condicional</span>
+            <span class="pill">📐 Cálculos</span>
           </div>
         </div>
       </div>
@@ -304,6 +304,36 @@
             <option value="JC5">JC5</option>
           </select>
         </div>
+
+        <!-- NOVO: dimensão -->
+        <div class="field hide" id="wrap_dimensao">
+          <label>Dimensão da amostra</label>
+          <input id="f_dimensao" type="text" placeholder="Ex.: 1600x1000 (mm) ou 1,600x1,000 (m)" />
+          <div class="hint">
+            Aceita: <b>1600x1000</b> (mm) ou <b>1,600x1,000</b> (m).
+            Se não tiver unidade, o sistema assume <b>mm</b>.
+          </div>
+        </div>
+
+        <!-- NOVO: m² calculado -->
+        <div class="field hide" id="wrap_m2">
+          <label>m² (calculado)</label>
+          <input id="f_m2" type="text" readonly />
+          <div class="hint">Cálculo: largura × altura (convertendo para metro quando necessário).</div>
+        </div>
+
+        <!-- NOVO: tonelagem calculada -->
+        <div class="field hide" id="wrap_ton">
+          <label>Tonelagem (calculada)</label>
+          <input id="f_ton" type="text" readonly />
+          <div class="hint">Cálculo: m² × densidade (sempre <b>2,5</b>).</div>
+        </div>
+
+        <!-- NOVO: número de quebras -->
+        <div class="field hide" id="wrap_quebras">
+          <label>Número de quebras</label>
+          <input id="f_quebras" type="number" min="0" step="1" placeholder="0" />
+        </div>
       </div>
 
       <div class="row" style="justify-content:space-between;margin-top:12px;">
@@ -374,9 +404,11 @@
     // CONFIG (AJUSTE AQUI)
     // =========================
     const DEFAULT_GH_OWNER = "carloscarneiro1";
-    const DEFAULT_GH_REPO  = "TabuladorHeatSoak";   // <- se quiser, troque para o nome real do seu repo
+    const DEFAULT_GH_REPO  = "TabuladorHeatSoak";   // <- troque para o nome real do seu repo, se quiser
     const DEFAULT_GH_PATH  = "heatsoak_registros.csv";
     const DEFAULT_GH_BRANCH= "main";
+
+    const DENSIDADE_FIXA = 2.5; // sempre 2,5 (conforme solicitado)
 
     // =========================
     // HELPERS
@@ -391,6 +423,80 @@
         return `"${s.replace(/"/g,'""')}"`;
       }
       return s;
+    }
+    function fmtBR(num, dec=3){
+      const n = Number(num);
+      if(!isFinite(n)) return "";
+      return n.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
+
+    // Converte "1,600" -> 1.6 ; "1600" -> 1600
+    function parsePtNumber(s){
+      const t = String(s || "").trim();
+      if(!t) return NaN;
+      // remove espaços
+      const cleaned = t.replace(/\s+/g,"");
+      // se tiver "," e "." juntos, assume milhar/decimal (pt-BR) -> remove "." milhar e troca "," por "."
+      if(cleaned.includes(",") && cleaned.includes(".")){
+        return Number(cleaned.replace(/\./g,"").replace(",","."));
+      }
+      // se tiver só ",", pode ser decimal
+      if(cleaned.includes(",")){
+        return Number(cleaned.replace(",","."));
+      }
+      return Number(cleaned);
+    }
+
+    // Parse dimensão:
+    // - Aceita "1600x1000", "1600 x 1000", "1,600x1,000", "1.600x1.000"
+    // - Se não tiver unidade, assume mm.
+    // - Se tiver "m" explicitamente, assume metros.
+    function parseDimensaoToM2(input){
+      const raw = String(input || "").trim();
+      if(!raw) return { m2: NaN, w: NaN, h: NaN, unit:"" };
+
+      const lower = raw.toLowerCase();
+
+      // identifica unidade
+      let unit = "";
+      if(lower.includes("mm")) unit = "mm";
+      else if(lower.includes("cm")) unit = "cm";
+      else if(lower.includes("m")) unit = "m"; // atenção: "mm" já foi tratado antes
+
+      // remove unidade e caracteres estranhos, normaliza separador "x"
+      let s = lower
+        .replace(/mm|cm|m/g,"")
+        .replace(/×/g,"x")
+        .replace(/\s+/g,"")
+        .replace(/[^0-9x,\.]/g,"");
+
+      const parts = s.split("x").filter(Boolean);
+      if(parts.length < 2) return { m2: NaN, w: NaN, h: NaN, unit };
+
+      const wRaw = parsePtNumber(parts[0]);
+      const hRaw = parsePtNumber(parts[1]);
+      if(!isFinite(wRaw) || !isFinite(hRaw) || wRaw <= 0 || hRaw <= 0){
+        return { m2: NaN, w: wRaw, h: hRaw, unit };
+      }
+
+      // se unidade não especificada, assume mm
+      if(!unit) unit = "mm";
+
+      let wM = wRaw;
+      let hM = hRaw;
+
+      if(unit === "mm"){
+        wM = wRaw / 1000;
+        hM = hRaw / 1000;
+      }else if(unit === "cm"){
+        wM = wRaw / 100;
+        hM = hRaw / 100;
+      }else if(unit === "m"){
+        wM = wRaw; hM = hRaw;
+      }
+
+      const m2 = wM * hM;
+      return { m2, w: wM, h: hM, unit };
     }
 
     // =========================
@@ -440,8 +546,31 @@
     const wrapQtd    = document.getElementById("wrap_qtd");
     const wrapOrigem = document.getElementById("wrap_origem");
 
+    const wrapDimensao = document.getElementById("wrap_dimensao");
+    const wrapM2       = document.getElementById("wrap_m2");
+    const wrapTon      = document.getElementById("wrap_ton");
+    const wrapQuebras  = document.getElementById("wrap_quebras");
+
+    const fDimensao = document.getElementById("f_dimensao");
+    const fM2 = document.getElementById("f_m2");
+    const fTon = document.getElementById("f_ton");
+
     function show(el){ el.classList.remove("hide"); }
     function hide(el){ el.classList.add("hide"); }
+
+    function calcM2Ton(){
+      const dim = limparCampo(fDimensao.value);
+      const parsed = parseDimensaoToM2(dim);
+      if(!isFinite(parsed.m2) || parsed.m2 <= 0){
+        fM2.value = "";
+        fTon.value = "";
+        return;
+      }
+      const m2 = parsed.m2;
+      const ton = m2 * DENSIDADE_FIXA;
+      fM2.value = fmtBR(m2, 3);
+      fTon.value = fmtBR(ton, 3);
+    }
 
     function applyConditional(){
       const v = limparCampo(fRealizado.value);
@@ -449,6 +578,7 @@
       if(!v){
         hide(wrapEtapa); hide(wrapMotivo);
         hide(wrapData); hide(wrapLote); hide(wrapQtd); hide(wrapOrigem);
+        hide(wrapDimensao); hide(wrapM2); hide(wrapTon); hide(wrapQuebras);
         return;
       }
 
@@ -458,9 +588,13 @@
       if(v === "NAO"){
         show(wrapMotivo);
         hide(wrapData); hide(wrapLote); hide(wrapQtd); hide(wrapOrigem);
+        hide(wrapDimensao); hide(wrapM2); hide(wrapTon); hide(wrapQuebras);
       }else{
         hide(wrapMotivo);
         show(wrapData); show(wrapLote); show(wrapQtd); show(wrapOrigem);
+
+        // NOVOS CAMPOS DO SIM
+        show(wrapDimensao); show(wrapM2); show(wrapTon); show(wrapQuebras);
 
         // se data vazia, coloca hoje
         const fData = document.getElementById("f_data");
@@ -471,16 +605,19 @@
           const dd = String(today.getDate()).padStart(2,"0");
           fData.value = `${yyyy}-${mm}-${dd}`;
         }
+
+        calcM2Ton();
       }
     }
     fRealizado.addEventListener("change", applyConditional);
+    fDimensao.addEventListener("input", calcM2Ton);
 
     // =========================
     // REGISTROS (MEMÓRIA LOCAL) + CSV
     // =========================
     let registros = [];
 
-    // Tenta carregar o CSV existente do raw (se houver) só para manter continuidade
+    // Tenta carregar o CSV existente do raw (se houver)
     async function loadExisting(){
       document.getElementById("loadState").textContent = "carregando...";
       setTokenState();
@@ -494,7 +631,6 @@
           registros = parseRegistros(txt);
           document.getElementById("loadState").textContent = "ok";
         }else{
-          // arquivo pode não existir ainda
           document.getElementById("loadState").textContent = "ok";
         }
       }catch{
@@ -503,7 +639,7 @@
     }
 
     // Header:
-    // timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem
+    // timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem;dimensao;m2;tonelagem;numQuebras
     function parseRegistros(csv){
       const txt = (csv || "").trim();
       if(!txt) return [];
@@ -511,12 +647,11 @@
       if(linhas.length < 1) return [];
 
       const delim = linhas[0].includes(";") ? ";" : ",";
-      const header = linhas[0];
-      const hasHeader = header.toLowerCase().includes("timestam") && header.toLowerCase().includes("etapa");
+      const header = linhas[0].toLowerCase();
+      const hasHeader = header.includes("timestamp") && header.includes("foipossivel");
       const data = hasHeader ? linhas.slice(1) : linhas;
 
       function parseLine(line){
-        // parse simples p/ CSV com aspas
         const out = [];
         let cur = "";
         let inQuotes = false;
@@ -548,13 +683,17 @@
           dataRegistro: c[4] || "",
           loteTeste: c[5] || "",
           qtdChapas: c[6] || "",
-          origem: c[7] || ""
+          origem: c[7] || "",
+          dimensao: c[8] || "",
+          m2: c[9] || "",
+          tonelagem: c[10] || "",
+          numQuebras: c[11] || ""
         };
       }).filter(Boolean);
     }
 
     function buildCSV(){
-      const header = "timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem";
+      const header = "timestampISO;foiPossivel;etapa;motivoNao;dataRegistro;loteTeste;qtdChapas;origem;dimensao;m2;tonelagem;numQuebras";
       const lines = [header];
       registros.forEach(r=>{
         lines.push([
@@ -565,7 +704,11 @@
           safeCSV(r.dataRegistro),
           safeCSV(r.loteTeste),
           safeCSV(r.qtdChapas),
-          safeCSV(r.origem)
+          safeCSV(r.origem),
+          safeCSV(r.dimensao),
+          safeCSV(r.m2),
+          safeCSV(r.tonelagem),
+          safeCSV(r.numQuebras)
         ].join(";"));
       });
       return lines.join("\n") + "\n";
@@ -578,14 +721,19 @@
     document.getElementById("btnExport").addEventListener("click", exportCSV);
 
     function validateAndCollect(){
-      const foiPossivel = limparCampo(document.getElementById("f_realizado").value);
-      const etapa = limparCampo(document.getElementById("f_etapa").value);
+      const foiPossivel = limparCampo(document.getElementById("fs").value);
+      }
 
       const motivoNao = limparCampo(document.getElementById("f_motivo").value);
       const dataRegistro = limparCampo(document.getElementById("f_data").value);
       const loteTeste = limparCampo(document.getElementById("f_lote").value);
       const qtdChapas = limparCampo(document.getElementById("f_qtd").value);
       const origem = limparCampo(document.getElementById("f_origem").value);
+
+      const dimensao = limparCampo(document.getElementById("f_dimensao").value);
+      const m2txt = limparCampo(document.getElementById("f_m2").value);
+      const tontxt = limparCampo(document.getElementById("f_ton").value);
+      const numQuebras = limparCampo(document.getElementById("f_quebras").value);
 
       if(!foiPossivel){
         return { ok:false, msg:"Selecione <b>Foi possível realizar o teste?</b>." };
@@ -603,21 +751,36 @@
         if(!loteTeste)   return { ok:false, msg:"Preencha o <b>Lote de teste</b>." };
         if(!qtdChapas || Number(qtdChapas) < 0) return { ok:false, msg:"Preencha a <b>Quantidade de chapas testadas</b>." };
         if(!origem)     return { ok:false, msg:"Selecione a <b>Origem</b> (JC1/JC3/JC5)." };
+
+        if(!dimensao)   return { ok:false, msg:"Preencha a <b>Dimensão da amostra</b> (ex.: 1600x1000)." };
+
+        const parsed = parseDimensaoToM2(dimensao);
+        if(!isFinite(parsed.m2) || parsed.m2 <= 0){
+          return { ok:false, msg:"Dimensão inválida. Use <b>1600x1000</b> (mm) ou <b>1,600x1,000</b> (m)." };
+        }
+
+        // número de quebras: opcional? você pediu criar campo, vou validar como não-negativo (pode vazio = 0)
+        if(numQuebras !== "" && (Number(numQuebras) < 0 || !isFinite(Number(numQuebras)))){
+          return { ok:false, msg:"O campo <b>Número de quebras</b> deve ser 0 ou maior." };
+        }
       }
 
-      return {
-        ok:true,
-        data:{
-          timestampISO: new Date().toISOString(),
-          foiPossivel,
-          etapa,
-          motivoNao: foiPossivel === "NAO" ? motivoNao : "",
-          dataRegistro: foiPossivel === "SIM" ? dataRegistro : "",
-          loteTeste: foiPossivel === "SIM" ? loteTeste : "",
-          qtdChapas: foiPossivel === "SIM" ? String(qtdChapas) : "",
-          origem: foiPossivel === "SIM" ? origem : ""
-        }
+      const rec = {
+        timestampISO: new Date().toISOString(),
+        foiPossivel,
+        etapa,
+        motivoNao: foiPossivel === "NAO" ? motivoNao : "",
+        dataRegistro: foiPossivel === "SIM" ? dataRegistro : "",
+        loteTeste: foiPossivel === "SIM" ? loteTeste : "",
+        qtdChapas: foiPossivel === "SIM" ? String(qtdChapas) : "",
+        origem: foiPossivel === "SIM" ? origem : "",
+        dimensao: foiPossivel === "SIM" ? dimensao : "",
+        m2: foiPossivel === "SIM" ? (m2txt || "") : "",
+        tonelagem: foiPossivel === "SIM" ? (tontxt || "") : "",
+        numQuebras: foiPossivel === "SIM" ? (numQuebras === "" ? "0" : String(numQuebras)) : ""
       };
+
+      return { ok:true, data: rec };
     }
 
     async function saveRegistro(){
@@ -661,10 +824,9 @@
           sha = data.sha;
           const decoded = atob((data.content || "").replace(/\n/g,""));
           currentContent = decoded || "";
-          registros = parseRegistros(currentContent); // reindexa do arquivo real
+          registros = parseRegistros(currentContent); // re-sync do arquivo real
           registros.push(rec);
         }else if(getResp.status === 404){
-          // arquivo ainda não existe
           sha = null;
           currentContent = "";
         }else{
@@ -783,7 +945,7 @@
       setTokenState();
       modal.classList.add("hide");
       document.getElementById("saveHint").innerHTML = `<span class="ok">Config salva!</span>`;
-      loadExisting(); // tenta carregar o arquivo do novo repo/caminho
+      loadExisting();
     });
 
     document.getElementById("btnClearToken").addEventListener("click", ()=>{
